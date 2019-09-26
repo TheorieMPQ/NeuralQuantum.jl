@@ -23,24 +23,25 @@ end
 
 export NAryState
 
+# custom accessors
+@inline config(state::NAryState) = state.σ
+
 ## Property Accessors
 @inline spacedimension(st::NAryState) = st.space_dim
+@inline nsites(state::NAryState) = state.n
+@inline local_dimension(state::Type{NAryState{T,N}}) where {T,N} = N
+@inline local_dimension(state::NAryState{T,N}) where {T,N} = local_dimension(typeof(state))
+@inline eltype(state::NAryState{T,N}) where {T,N} = T
+
 @inline toint(state::NAryState) = state.i_σ
 @inline index(state::NAryState) = toint(state)+1
 @inline index_to_int(state::NAryState, id) = id - 1
-@inline nsites(state::NAryState) = state.n
-@inline local_dimension(state::NAryState{T,N}) where {T,N} = N
-
-# custom accessors
-@inline config(state::NAryState) = state.σ
-@inline eltype(state::NAryState{T,N}) where {T,N} = T
 
 # checks
-same_basis(s1::NAryState{T,N}, s2::NAryState{T2,N2}) where {T,T2,N,N2} =
-    N==N2 && s1.n == s2.n
+same_basis(s1::NAryState, s2::NAryState)  =
+    nsites(s1)==nsites(s2) && local_dimension(s1) == local_dimension(s2) && eltype(s1) == eltype(s2)
 
 # Operations on tuples
-
 @inline _toint(left::NAryState{T,N}, right::NAryState{T,N}) where {T,N} =
     toint(left) * spacedimension(right) + toint(right)
 #@inline index(row::NAryState, col::NAryState) = toint(row, col) + 1
@@ -54,6 +55,12 @@ end=#
 
 
 # Operations
+"""
+    flipat!(rng, state, site) -> (old_val, new_val)
+
+Flips `state[site]` to a random new state. The old value is returned together
+with the new value.
+"""
 function flipat!(rng::AbstractRNG, state::NAryState{T, N}, i::Int) where {T, N}
     old_val = state.σ[i]
 
@@ -70,6 +77,15 @@ function flipat!(rng::AbstractRNG, state::NAryState{T, N}, i::Int) where {T, N}
     return (old_val, new_val)
 end
 
+# For Nary states the fast method is equivalent to the standard one
+flipat_fast!(rng::AbstractRNG, state::NAryState, i::Int) =
+    flipat!(rng, state, i)
+
+"""
+    setat!(state, site, value) -> old_val
+
+Sets `state[site] = value`. Returns the old value of `state[site]`
+"""
 function setat!(state::NAryState{T, N}, i::Int, val::T) where {T, N}
     old_val = state.σ[i]
 
@@ -109,6 +125,28 @@ IntegerToState(n_sites, loc_dim, val, T::Type{<:Number}) =
     end
     arr
 end
+
+# --- Indexing function for local spaces used in operators
+local_index(s::NAryState, i::T) where {T<:Integer} =
+    T(s.σ[i])+1
+
+function local_index(s::NAryState{T,Nb}, is::AbstractVector{T2}) where {T,Nb,T2<:Integer}
+    idx = 1
+    for (i,j)=enumerate(is)
+        idx += T2(s.σ[j]) * Nb^(i-1)
+    end
+    return idx
+end
+# -- end
+
+function apply!(state::NAryState, changes::StateChanges)
+    for (id, val)=changes
+        setat!(state, id, val)
+    end
+    return state
+end
+
+
 # -------------- Base.show extension for nice printing -------------- #
 Base.show(io::IO, ::MIME"text/plain", bs::NAryState) = print(io, "NAryState(",bs.n,") : ", String(bs.σ,false),
                                            " = ", bs.i_σ)

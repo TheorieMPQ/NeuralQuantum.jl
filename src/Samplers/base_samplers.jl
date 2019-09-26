@@ -1,6 +1,3 @@
-export cache, init_sampler!, done, samplenext!
-
-abstract type Sampler end
 abstract type MonteCarloSampler <: Sampler end
 abstract type FullSpaceSampler <: Sampler end
 
@@ -13,7 +10,7 @@ abstract type SamplerCache{T}  end
 
 Creates a `SamplerCache` for this problem and sampler.
 """
-cache(s::Sampler, prob::Problem, net, par=NotParallel()) =
+cache(s::Sampler, prob::AbstractProblem, net, par=NotParallel()) =
     cache(s, state(prob, net), net, par)
 
 """

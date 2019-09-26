@@ -33,7 +33,7 @@ struct SR{T1,T2,T3,TP} <: Algorithm
     λmin::TP
 end
 
-SR(T::Type=Float64;ϵ=0.001, use_iterative=true, precision=10e-5,
+SR(T::Type=STD_REAL_PREC; ϵ=0.001, use_iterative=true, precision=10e-5,
    precondition_type=sr_shift,
    λ0=100.0, b=0.95, λmin=1e-4) = SR(T(ϵ), T(1.0), T(precision),
                                           precondition_type, use_iterative,
@@ -68,15 +68,19 @@ mutable struct SREvaluation{TL,TF,TS} <: EvaluatedAlgorithm
     F::TF
     S::TS
 
+    # Individual values to compute statistical correlators
     LVals::Vector
 end
 
 function SREvaluation(net::NeuralNetwork)
-    wt = weight_tuple(net)
+    wt = grad_cache(net) # this should be weight_type
+    WT = weight_type(net)
     T = out_type(net)
 
-    F = Tuple([zero(w) for w=wt.tuple_all_weights])
-    S = Tuple([zero(w.*w') for w=wt.tuple_all_weights])
+
+    F = Tuple([zeros(WT,size(w)) for w=wt.tuple_all_weights])
+    S = Tuple([zeros(WT,size(w*w')) for w=wt.tuple_all_weights])
+
 
     SREvaluation(zero(T),
                  F,

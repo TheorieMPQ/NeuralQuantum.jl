@@ -1,29 +1,31 @@
 ################################################################################
 ######      Cache holding the information generated along a sampling      ######
 ################################################################################
-mutable struct MCMCGradientLEvaluationCache{T,T2,TV,TD} <: EvaluationSamplingCache
+mutable struct MCMCGradientLEvaluationCache{T,T2,TV,TVC,TD,S} <: EvaluationSamplingCache
     Oave::TV#Vector{T}
     Eave::T
-    EOave::TV#Vector{T}
-    LLOave::TV#Vector{T}
+    EOave::TVC
+    LLOave::TVC
     Zave::T2
 
+    # Individual values to compute statistical correlators
     Evalues::Vector{T}
 
-    # cache
-    LLO_i::TV
+    # Caches to avoid allocating during computation
+    LLO_i::TVC
     ∇lnψ::TD
     ∇lnψ2::TD
+    σ::S
 end
 
-function MCMCGradientLEvaluationCache(net)
+function MCMCGradientLEvaluationCache(net::NeuralNetwork, prob)
     TC = Complex{real(out_type(net))}
     der_vec = grad_cache(net).tuple_all_weights
 
     Oave   = [zero(dvec) for dvec=der_vec]
-    EOave  = [zero(dvec) for dvec=der_vec]
-    LLOave = [zero(dvec) for dvec=der_vec]
-    LLO_i = [zero(dvec) for dvec=der_vec]
+    EOave  = [zeros(TC, size(dvec)) for dvec=der_vec]
+    LLOave = [zeros(TC, size(dvec)) for dvec=der_vec]
+    LLO_i  = [zeros(TC, size(dvec)) for dvec=der_vec]
 
     cache = MCMCGradientLEvaluationCache(Oave,
                                   zero(TC),
@@ -33,11 +35,12 @@ function MCMCGradientLEvaluationCache(net)
                                   Vector{TC}(),
                                   LLO_i,
                                   grad_cache(net),
-                                  grad_cache(net))
+                                  grad_cache(net),
+                                  state(prob, net))
     zero!(cache)
 end
 
-SamplingCache(alg::Gradient, prob::LRhoSquaredProblem, net) = MCMCGradientLEvaluationCache(net)
+SamplingCache(alg::Gradient, prob::LRhoSquaredProblem, net) = MCMCGradientLEvaluationCache(net, prob)
 
 function zero!(comp_vals::MCMCGradientLEvaluationCache)
     comp_vals.Eave   = 0.0
@@ -100,6 +103,7 @@ function evaluation_post_sampling!(out::GradientEvaluation,
      end
 end
 
+#=
 function sample_network!(res::MCMCGradientLEvaluationCache, prob::LRhoSquaredProblem,
                          net, σ, wholespace=false)
   CLO_i = res.LLO_i
@@ -121,3 +125,4 @@ function sample_network!(res::MCMCGradientLEvaluationCache, prob::LRhoSquaredPro
   end
   return res
 end
+=#

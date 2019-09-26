@@ -24,13 +24,15 @@ DoubleState{ST}(n, i_σ=0) where ST = set!(DoubleState(ST(n, 0), ST(n, 0)), i_σ
 
 
 # Property Accessors
-spacedimension(state::DoubleState) = state.space_dim
-nsites(state::DoubleState) = 2*nsites(state.σ_row)
+@inline spacedimension(state::DoubleState) = state.space_dim
+@inline nsites(state::DoubleState) = 2*nsites(state.σ_row)
+@inline local_dimension(state::DoubleState{ST}) where {ST} = local_dimension(ST)
+@inline eltype(state::DoubleState) = eltype(row(state))
+
 toint(state::DoubleState) = _toint(col(state), row(state)) #toint(state.σ_row, state.σ_col)
 index(state::DoubleState) = toint(state) + 1 # was before
 index_to_int(state::DoubleState, id) = (id -1)
 flipped(a::DoubleState, b::DoubleState) = (flipped(a.σ_row, b.σ_row), flipped(a.σ_col, b.σ_col))
-@inline eltype(state::DoubleState) = eltype(row(state))
 
 # custom accessor
 row(v::DoubleState) = v.σ_row
@@ -38,7 +40,7 @@ col(v::DoubleState) = v.σ_col
 @inline config(v::DoubleState) = (config(v.σ_row), config(v.σ_col))
 #@inline config(v::DoubleState) = return config(v.σ_row), config(v.σ_col)
 
-# checs
+# checks
 same_basis(v::DoubleState{ST}, v2::DoubleState{ST2}) where {ST, ST2} =
     ST==ST2 && same_basis(row(v), row(v2)) && same_basis(col(v), col(v2))
 
@@ -46,9 +48,23 @@ function flipat!(rng::AbstractRNG, v::DoubleState, i::Int)
     i > v.n ? flipat!(rng, v.σ_row, i-v.n) : flipat!(rng, v.σ_col, i)
 end
 
+function flipat_fast!(rng::AbstractRNG, v::DoubleState, i::Int)
+    i > v.n ? flipat_fast!(rng, v.σ_row, i-v.n) : flipat_fast!(rng, v.σ_col, i)
+end
+
 function setat!(v::DoubleState, i::Int, val)
     i > v.n ? setat!(v.σ_row, i-v.n, val) : setat!(v.σ_col, i, val)
 end
+
+#=function apply!(state::DoubleState, changes::DoubleStateChanges)
+    for (id, val)=row(changes)
+        setat!(row(state), id, val)
+    end
+    for (id, val)=col(changes)
+        setat!(col(state), id, val)
+    end
+    return state
+end=#
 
 set_index!(v::DoubleState, i::Integer) = set!(v, index_to_int(v, i))
 function set!(v::DoubleState, i::Integer)
@@ -57,7 +73,7 @@ function set!(v::DoubleState, i::Integer)
 
     set!(v.σ_col, row) #i
     set!(v.σ_row, col) #j
-    v
+    return v
 end
 set!(v::DoubleState, i_row, i_col) = (set!(row(v), i_row); set!(col(v), i_col);  v)
 

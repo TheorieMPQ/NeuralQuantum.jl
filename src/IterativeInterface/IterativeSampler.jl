@@ -1,4 +1,5 @@
-export IterativeSampler, sample!
+export IterativeSampler
+
 mutable struct IterativeSampler{N,P,IC,EC,S,SC,V} <: AbstractIterativeSampler
     net::N
     problem::P
@@ -50,3 +51,9 @@ function sample!(is::IterativeSampler)
     evaluation_post_sampling!(is.sampled_values, is.itercache)
     return is.sampled_values
 end
+
+Base.show(io::IO, is::IterativeSampler) = print(io,
+    "IterativeSampler for :"*
+    "\n\tnet\t\t: $(is.net)"*
+    "\n\tproblem\t: $(is.problem)"*
+    "\n\tsampler\t: $(is.sampler)")

@@ -1,31 +1,33 @@
 ################################################################################
 ######      Cache holding the information generated along a sampling      ######
 ################################################################################
-mutable struct MCMCSRLEvaluationCache{T,T2,TV,TM,TD} <: EvaluationSamplingCache
+mutable struct MCMCSRLEvaluationCache{T,T2,TV,TVC,TM,TD,S} <: EvaluationSamplingCache
     Oave::TV#Vector{T}
     OOave::TM#Matrix{T}
     Eave::T
-    EOave::TV#Vector{T}
-    LLOave::TV#Vector{T}
+    EOave::TVC
+    LLOave::TVC
     Zave::T2
 
+    # Individual values to compute statistical correlators
     Evalues::Vector{T}
 
-    # cache
-    LLO_i::TV
+    # Caches to avoid allocating during computation
+    LLO_i::TVC
     ∇lnψ::TD
     ∇lnψ2::TD
+    σ::S
 end
 
-function MCMCSRLEvaluationCache(net::NeuralNetwork)
+function MCMCSRLEvaluationCache(net::NeuralNetwork, prob)
     TC = Complex{real(out_type(net))}
     der_vec = grad_cache(net).tuple_all_weights
 
     Oave   = [zero(dvec) for dvec=der_vec]
     OOave  = [zeros(eltype(dvec), length(dvec), length(dvec)) for dvec=der_vec]
-    EOave  = [zero(dvec) for dvec=der_vec]
-    LLOave = [zero(dvec) for dvec=der_vec]
-    LLO_i = [zero(dvec) for dvec=der_vec]
+    EOave  = [zeros(TC, size(dvec)) for dvec=der_vec]
+    LLOave = [zeros(TC, size(dvec)) for dvec=der_vec]
+    LLO_i  = [zeros(TC, size(dvec)) for dvec=der_vec]
 
     cache = MCMCSRLEvaluationCache(Oave,
                                   OOave,
@@ -36,11 +38,12 @@ function MCMCSRLEvaluationCache(net::NeuralNetwork)
                                   Vector{TC}(),
                                   LLO_i,
                                   grad_cache(net),
-                                  grad_cache(net))
+                                  grad_cache(net),
+                                  state(prob, net))
     zero!(cache)
 end
 
-SamplingCache(alg::SR, prob::LRhoSquaredProblem, net) = MCMCSRLEvaluationCache(net)
+SamplingCache(alg::SR, prob::LRhoSquaredProblem, net) = MCMCSRLEvaluationCache(net, prob)
 
 function zero!(comp_vals::MCMCSRLEvaluationCache)
     comp_vals.Eave   = 0.0

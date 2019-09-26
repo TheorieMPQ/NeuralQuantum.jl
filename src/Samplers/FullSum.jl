@@ -13,7 +13,8 @@ _sampler_cache(s::FullSumSampler, v::FiniteBasisState, net, part) =
 
 function init_sampler!(sampler::FullSumSampler, net, σ::FiniteBasisState, c::FullSumSamplerCache)
     c.last_position = 1
-    set_index!(σ, c.interval[1])
+    # only initialize if it's really bigger.
+    length(c.interval) >0 && set_index!(σ, c.interval[1])
     return c
 end
 
@@ -40,5 +41,5 @@ function _divide_in_blocks(interval, rank, n_par)
     return iter_start:iter_end
 end
 
-_sampler_cache(s::FullSumSampler, v::FiniteBasisState, net, ::ParallelThreaded) =
-    FullSumSamplerCache(0, _divide_in_blocks(1:spacedimension(v), Threads.threadid(), Threads.nthreads()))
+_sampler_cache(s::FullSumSampler, v::FiniteBasisState, net, ::ParallelThreaded, thread_i) =
+    FullSumSamplerCache(0, _divide_in_blocks(1:spacedimension(v), thread_i, Threads.nthreads()))

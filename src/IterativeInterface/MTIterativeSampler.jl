@@ -1,4 +1,5 @@
 export MTIterativeSampler
+
 mutable struct MTIterativeSampler{N,P,IC,MIC,EC,S,SC,V} <: AbstractIterativeSampler
     net::N
     problem::P
@@ -56,8 +57,14 @@ function sample!(is::MTIterativeSampler)
     # Add results of all threads
     zero!(is.itercache);
     for ic=is.mitercache
-        NeuralQuantumBase.add!(is.itercache, ic)
+        NeuralQuantum.add!(is.itercache, ic)
     end
     evaluation_post_sampling!(is.sampled_values, is.itercache)
     return is.sampled_values
 end
+
+Base.show(io::IO, is::MTIterativeSampler) = print(io,
+    "MTIterativeSampler for parallel sampling with $(Threads.nthreads()) threads:"*
+    "\n\tnet\t\t: $(is.net)"*
+    "\n\tproblem\t: $(is.problem)"*
+    "\n\tsampler\t: $(is.sampler)")

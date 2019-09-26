@@ -1,5 +1,3 @@
-export get_sampler, sampler_list, multithread
-
 """
     MTSampler{ST} <: Sampler where ST<:Sampler
 
@@ -47,6 +45,10 @@ recompute_params!(s::MTSampler) = _mt_recompute_sampler_params!(getfield(s, :sam
 get_sampler(s::MTSampler) = getfield(s, :sampler)
 sampler_list(s::MTSampler) = getfield(s, :samplers)
 
+function Base.show(io::IO, s::MTSampler)
+    print(io, "MTSampler ($(length(sampler_list(s))) threads) of $(get_sampler(s))")
+end
+
 ##
 """
     MTSamplerCache
@@ -79,17 +81,27 @@ function _mt_sampler_cache(s::MTSampler, v, net, ::ParallelThreaded)
     scs = Vector{T}(undef, Threads.nthreads())
 
     Threads.@threads for i=1:Threads.nthreads()
-        scs[i] = _sampler_cache(sampler_list(s)[i], v, net, ParallelThreaded())
+        scs[i] = _sampler_cache(sampler_list(s)[i], v, net, ParallelThreaded(), i)
     end
 
     return MTSamplerCache(s, scs, net, v)
 end
 
+# Basic fallback: some samplers dont need any extra computation in case they are
+# parallel, and therefore the cache creation has a signature with 4 arguments, not
+# five. To fallback to use standard sampler cache if possible, we add this method.
+_sampler_cache(s::Sampler, v, net, t::ParallelThreaded, thread_i) =
+    _sampler_cache(s, v, net, t)
 
 # The call tree for init_sampler is the following: if called with multithreading
 # structures, first it updates the weight in the cached networks, then it calls
-# mt_init_sampler, which can be overridden by the user. If simple functionality
-# is sufficient, then you can just override mt_init_sampler_perthread.
+# `mt_init_sampler`, which can be overridden by the user. By default
+# `mt_init_sampler` calls `mt_init_sampler_perthread` on every thread, which in
+# turns default to calling `init_sampler!`.
+# If a sampler must run some specific thread-local operations, it must override
+# `*_perthread`.  If it must run more complicated logic involving syncronization
+# among threads, then `mt_init_sampler` must be overridden. See respectively
+# the examples of `FullSumSampler` and `ExactSampler`.
 function init_sampler!(s::MTSampler, net, σ, c::MTSamplerCache)
     for cn=c.nets
         update!(Optimisers.Identity(), cn, net, nothing)
@@ -97,6 +109,11 @@ function init_sampler!(s::MTSampler, net, σ, c::MTSamplerCache)
     mt_init_sampler(s, net, σ, c)
 end
 
+"""
+    mt_init_sampler(s::MTSampler, net, σ, c::MTSamplerCache)
+
+Initializes a MTSamplerCache object.
+"""
 function mt_init_sampler(s::MTSampler, net, σ, c::MTSamplerCache)
     Threads.@threads for i=1:Threads.nthreads()
         mt_init_sampler_perthread(sampler_list(s)[i],
